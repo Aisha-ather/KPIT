@@ -1,5 +1,35 @@
-Found unhandled java.lang.NullPointerException exception:
-
-Cannot invoke method getYmlDataFromResource() on null object
-
-	org.codehaus.groovy.runtime.NullObject.invokeMethod(NullObject.java:91)
+pipeline {
+    agent any
+    environment {
+        // Define any global environment variables here
+    }
+    stages {
+        stage('Initialization') {
+            steps {
+                script {
+                    // Attempt to load libUtils.groovy
+                    def libUtils
+                    try {
+                        libUtils = load '/home/alpinecicd/Ayesha/shared-library-jenkins/vars/libUtils.groovy'
+                    } catch (Exception e) {
+                        echo "Failed to load libUtils: ${e.message}"
+                        // Handle the error appropriately
+                    }
+                    
+                    // Assuming libUtils is loaded, attempt to use it
+                    if (libUtils) {
+                        def ymlData = libUtils.getYmlDataFromResource()
+                        // Use ymlData as needed...
+                    } else {
+                        echo "libUtils is null, cannot proceed."
+                        // Take appropriate action, such as failing the build
+                    }
+                }
+            }
+        }
+        // Additional stages...
+    }
+    post {
+        // Post-build actions...
+    }
+}
