@@ -1,0 +1,9 @@
+Found unhandled groovy.lang.MissingPropertyException exception:
+
+No such property: ymlData for class: groovy.lang.Binding
+
+	groovy.lang.Binding.getVariable(Binding.java:63)
+
+	org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.SandboxInterceptor.onGetProperty(SandboxInterceptor.java:285)
+
+	org.kohsuke.groovy.sandbox.impl.Checker$7.call(Checker.java:375)
