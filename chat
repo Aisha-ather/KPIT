@@ -1,0 +1,78 @@
+Configuring a Jenkins shared library from a Gerrit repository involves a few specific steps since Gerrit is primarily used for code review and its integration with Jenkins is slightly different compared to more common source control management systems like GitHub or Bitbucket. Here's how you can set it up:
+
+### Step 1: Create a Shared Library in Gerrit
+
+First, ensure you have a shared library repository in Gerrit. Your library should follow the standard directory structure expected by Jenkins for shared libraries:
+
+```
+(your-shared-library-repo)/
++- src                     # Groovy source files
+|   +- org
+|       +- mycompany
+|           +- MyLib.groovy  # for org.mycompany.MyLib class
+|
++- vars
+|   +- myVar.groovy        # for global variable 'myVar'
+|   +- myVar.txt           # help text for 'myVar'
+|
++- resources               # resource files (non-Groovy files)
+    +- org
+        +- mycompany
+            +- data.json    # static helper data for org.mycompany.MyLib
+```
+
+### Step 2: Configure Jenkins to Access Gerrit
+
+Before Jenkins can access Gerrit, you need to ensure that:
+
+1. **Jenkins has network access to Gerrit.** If Gerrit is hosted internally and Jenkins is external (or vice versa), you'll need to ensure appropriate network access.
+
+2. **Credentials are set up in Jenkins for Gerrit access.** Jenkins will need permission to fetch from your Gerrit repository:
+
+    - Go to **Manage Jenkins** > **Manage Credentials**.
+    - Choose the scope for your credentials (global or specific to a Jenkins folder).
+    - Add credentials (username/password or SSH key) that Jenkins will use to access Gerrit.
+
+### Step 3: Configure the Shared Library in Jenkins
+
+1. Go to **Manage Jenkins** > **Configure System**.
+2. Find the **Global Pipeline Libraries** section and click on the **Add** button.
+3. Fill in the library configuration:
+   - **Name:** Choose a name for your library. This is how you'll reference it in your pipelines.
+   - **Default version:** Specify the branch or tag in Gerrit you want to use by default.
+   - **Retrieval method:** Choose **Modern SCM**.
+   - **Source Code Management:** Choose **Git**.
+   - **Project Repository:** Enter your Gerrit repository URL.
+   - **Credentials:** Select the credentials you added for Gerrit access.
+   - **Discover branches:** Choose how you want Jenkins to discover branches in your repository. For a shared library, you might typically point to a specific branch.
+   - If your Jenkins and Gerrit integration uses webhooks or polling to trigger builds, ensure those are configured to listen for changes to your shared library repository.
+
+### Step 4: Use the Shared Library in Jenkinsfiles
+
+With your shared library configured, you can now use it in Jenkinsfiles across your projects. To explicitly reference your shared library, use the `@Library` annotation with the name you assigned to your library in Jenkins:
+
+```groovy
+@Library('my-shared-library') _
+
+pipeline {
+    agent any
+    stages {
+        stage('Use Shared Library') {
+            steps {
+                script {
+                    // Example of calling a shared library's method
+                    org.mycompany.MyLib.someMethod()
+                }
+            }
+        }
+    }
+}
+```
+
+### Additional Considerations
+
+- **Gerrit Access Rights:** Ensure the Jenkins user has the appropriate rights in Gerrit to fetch the library code.
+- **Script Security in Jenkins:** Scripts from shared libraries are subject to Jenkins script security, so you may need to approve certain methods or classes for use in Jenkins pipelines.
+- **Gerrit Webhooks for Automation:** If you want Jenkins to automatically detect changes to your shared library, consider setting up Gerrit webhooks to notify Jenkins of changes. This may require additional plugins or configuration depending on your setup.
+
+By following these steps, you should be able to set up Jenkins to use a shared library stored in a Gerrit repository, enabling reusable pipeline code across your Jenkins projects.
