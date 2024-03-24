@@ -1,0 +1,16 @@
+Loading library shared-library@master
+Attempting to resolve master from remote references...
+ > git --version # timeout=10
+ > git --version # 'git version 2.25.1'
+using GIT_SSH to set credentials 
+Verifying host key using known hosts file
+ > git ls-remote -h -- ssh://10.52.96.11:29418/shared-library # timeout=10
+ERROR: Checkout failed
+hudson.plugins.git.GitException: Command "git ls-remote -h -- ssh://10.52.96.11:29418/shared-library" returned status code 128:
+stdout: 
+stderr: Load key "/mnt/kpit/scm_team/jd/apache-tomcat-9.0.86_2_8888/temp/jenkins-gitclient-ssh10595558140529623298.key": invalid format
+ayeshas1@10.52.96.11: Permission denied (publickey).
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
