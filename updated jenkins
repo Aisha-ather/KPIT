@@ -1,0 +1,674 @@
+def call() {
+	//Check Parameter
+	if (CRED_HONDA_GERRIT_USER.size() < 1) {
+		error("no parameter CRED_HONDA_GERRIT_USER.")
+		return
+	}
+	if (CRED_KPIT_GERRIT_USER.size() < 1) {
+		error("no parameter CRED_KPIT_GERRIT_USER.")
+		return
+	}
+	if (CRED_DP1188_ACCT.size() < 1) {
+		error("no parameter CRED_DP1188_ACCT.")
+		return
+	 }
+	//if (CRED_REDMINE_ACCT.size() < 1) {
+	//	error("no parameter CRED_REDMINE_ACCT.")
+	//	return
+	// }
+	//if (CRED_KPIT_SFTP_ACCT.size() < 1) {
+	//	error("no parameter CRED_KPIT_SFTP_ACCT.")
+	//	return
+	// }
+	//if (CRED_AWSSFTP_ACCT.size() < 1) {
+	//	error("no parameter CRED_AWSSFTP_ACCT.")
+	//	return
+	// }
+	if (CRED_JENKINS_TOKEN.size() < 1) {
+		error("no parameter CRED_JENKINS_TOKEN.")
+		return
+	}
+	if (MAIN_NODE.size() < 1) {
+		error("no parameter MAIN_NODE.")
+		return
+	}
+	//if (SFTP_NODE.size() < 1) {
+	//	error("no parameter SFTP_NODE.")
+	//	return
+	// }
+	if (GITMAIL_ADDR.size() < 1) {
+		error("no parameter GITMAIL_ADDR.")
+		return
+	}
+	if (JOB_TYPE.size() < 1) {
+		error("no parameter JOB_TYPE.")
+		return
+	}
+	if (YAML_NAME.size() < 1) {
+		error("no parameter YAML_NAME.")
+		return
+	}
+	if (MANIFEST_URL.size() < 1) {
+		error("no parameter MANIFEST_URL.")
+		return
+	}
+	if (MANIFEST_BRANCH.size() < 1) {
+		error("no parameter MANIFEST_BRANCH.")
+		return
+	}
+	if (BUILD_BOARD.size() < 1) {
+		error("no parameter BUILD_BOARD.")
+		return
+	}
+	if (SW_TYPE.size() < 1) {
+		error("no parameter SW_TYPE.")
+		return
+	}
+	if (BUILD_TYPE.size() < 1) {
+		error("no parameter BUILD_TYPE.")
+		return
+	}
+	ymlData = libUtils.getYmlDataFromResource()
+	sftpData = libUtils.getSFTPDataFromResource()
+	// Global Variables
+	err_msg = ""
+	WORK_OUTPUT = ""
+	SCRIPT_RESULT = ""
+	SCRIPTED_RESULT = ""
+	MTITLE_DIR = ""
+	DATE_DELIVER = libUtils.getNowTime()
+	DATE_DIR = ""
+	DATE_JOB = ""
+	NAME_DIRDP1188 = ""
+	CHK_SERVER = false
+	SET_SERVER = ""
+	ENABLE_ERASE = params.ERASE_WORKSPACE
+	LAST_BUILD_INFO_DIR = 'lastBuildInfo'
+	IS_SKIP_STAGE = false
+	//URL_SAMBASVR = 
+pipeline {
+	agent none
+	options {
+		timestamps()
+	}
+	environment {
+		NONE_MSG = "none"
+		SUCCESS_MSG = "SUCCESS"
+		CHK_DIRECTORY = "/mnt"
+		LT_SPACE = 200000
+		ERR_CHKSPACE = "Out of storage space."
+		MNTPOINTD = "/mnt/MNT_DP1188"
+		DATETIME = "${DATE_DELIVER}"
+	}
+	stages {
+		stage('Agent HM_build_servers') {
+			agent {
+				node {
+					label params.MAIN_NODE
+				}
+			}
+			stages {
+				stage('Check remaining capacity') {
+					steps {
+						script {
+							err_msg = env.NONE_MSG
+							WORK_OUTPUT = env.WORKSPACE + '/' + ymlData.DIR_OUTPUT
+							sh "touch ${env.WORKSPACE}"
+							def ltSpace = 200000
+							if (fileExists(WORK_OUTPUT)) {
+								ltSpace = 50000
+							}
+							def strSpace = sh(script: "echo -n `df -m /mnt | sed '1d' | awk '{print \$4}'`", returnStdout: true)
+							def numSpace = Integer.parseInt(strSpace)
+							if (numSpace < ltSpace) {
+								err_msg = ymlData.MSG_ERRSPACE
+								DATE_JOB = env.JOB_NAME
+								NAME_DIRDP1188 = "no server"
+								error(err_msg)
+							}
+						}
+					}
+				}
+				stage('Check parameters') {
+					steps {
+						script {
+							//.git-credentials
+							def retScript = sh(script: "[ -s ~/${ymlData.FILE_CREDENTIALS_BKUP} ]", returnStatus: true) == 0
+							if (retScript) {
+								sh "mv -f ~/${ymlData.FILE_CREDENTIALS_BKUP} ~/.git-credentials"
+							}
+							//.gitconfig
+							retScript = sh(script: "[ -s ~/${ymlData.FILE_CONFIG_BKUP} ]", returnStatus: true) == 0
+							if (retScript) {
+								sh "mv -f ~/${ymlData.FILE_CONFIG_BKUP} ~/.gitconfig"
+							}
+							//OUTPUT
+							if (fileExists(WORK_OUTPUT)) {
+								sh "rm -rf ${WORK_OUTPUT}"
+							}
+							sh "mkdir -p ${WORK_OUTPUT}"
+							//dp1188
+							if (params.JOB_TYPE == "ACiDS") {
+								MTITLE_DIR = ymlData.PATH_LD_DELIVER + "/" + ymlData.DIR_ACIDS
+							} else {
+								MTITLE_DIR = ymlData.PATH_LD_DELIVER + "/" + env.JOB_NAME
+							}
+							//makedirDp1188(MTITLE_DIR)
+							DATE_JOB = env.JOB_NAME + "_" + env.DATETIME
+							DATE_DIR = MTITLE_DIR + "/" + DATE_JOB
+							//makedirDp1188(DATE_DIR)
+							tmpdir = ymlData.PATH_LD_DP1188HM23_HN + "/" + MTITLE_DIR
+							NAME_DIRDP1188 = tmpdir.replace("/","\\")
+							//SFTP
+							if (params.TYPE_SFTP.size() > 0) {
+								sftpData.each {
+									if (params.TYPE_SFTP == it.name) {
+										CHK_SERVER = true
+										SET_SERVER = it
+									}
+								}
+							}
+//							redmine_api("'{\"issue\":{\"notes\":\"Build: Your request accepted.\", \"custom_fields\":[{\"value\":\"Under Build\", \"id\":297}]}}'")
+						}
+					}
+				}
+				stage('Set git credentials') {
+					environment {
+						CRED_ACCESS_MIC = credentials("${CRED_HONDA_GERRIT_USER}")
+						URL_ACCESS_MIC = ""
+//						PART_ACCESS_MIC_OLD = "@hrnd-ivipoc-gerrit.micdev.jp"
+//						URL_ACCESS_MIC_OLD = ""
+						CRED_ACCESS_APN = credentials("${CRED_KPIT_GERRIT_USER}")
+						URL_ACCESS_APN = ""
+					}
+					steps {
+						script {
+							def retScript = sh(script: "[ -s ~/.git-credentials ]", returnStatus: true) == 0
+							if (retScript) {
+								sh "mv -f ~/.git-credentials ~/${ymlData.FILE_CREDENTIALS_BKUP}"
+							}
+//							URL_ACCESS_MIC = make_credurl(CRED_ACCESS_MIC_USR, CRED_ACCESS_MIC_PSW, "@" + ymlData.DOMAIN_MIC_GERRIT)
+//							URL_ACCESS_MIC_REP = make_credurl(CRED_ACCESS_MIC_USR, CRED_ACCESS_MIC_PSW, "@gerrit-replica.honda-ivi.com")
+//							URL_ACCESS_APN = make_credurl(CRED_ACCESS_APN_USR, CRED_ACCESS_APN_PSW, "@" + ymlData.DOMAIN_APN_GERRIT)
+//							URL_ACCESS_MIC_OLD = make_credurl(CRED_ACCESS_MIC_USR, CRED_ACCESS_MIC_PSW, PART_ACCESS_MIC_OLD)
+//							def tmpgcred = URL_ACCESS_MIC + '\n' + URL_ACCESS_MIC_REP + '\n' + URL_ACCESS_APN + '\n' + URL_ACCESS_MIC_OLD
+//							writeFile(file: "tmpgcred.txt", text: tmpgcred)
+//							sh "mv -f tmpgcred.txt ~/.git-credentials"
+							//.gitconfig
+							sh "cp -p ~/.gitconfig ~/${ymlData.FILE_CONFIG_BKUP}"
+							sh "git config --global user.name ${CRED_ACCESS_MIC_USR}"
+							sh "git config --global user.email ${params.GITMAIL_ADDR}"
+							sh "git config --global credential.helper store"
+						}
+					}
+				}
+				stage('Construct Build env') {
+					steps {
+						script {
+							if (fileExists(env.WORKSPACE + '/' + ymlData.DIR_CHIPCODE)) {
+								println "Skip create clone. Update only."
+								dir(env.WORKSPACE + '/' + ymlData.DIR_CHIPCODE) {
+//									def errMsg = libGetEnv.updateChipcode(ymlData)
+//									if(errMsg.length() != 0) {
+//										error(errMsg)
+//									}
+								}
+							} else {
+								dir("${env.WORKSPACE}") {
+									sh("mkdir " + ymlData.DIR_CHIPCODE)
+//									def errMsg = libGetEnv.getChipcode(ymlData)
+//									if(errMsg.length() != 0) {
+//										error(errMsg)
+//									}
+								}
+							}
+							outputDir = env.WORKSPACE + '/' + ymlData.DIR_OUTPUT
+							dir(env.WORKSPACE + '/' + ymlData.DIR_CHIPCODE) {
+								libGetEnv.archiveChipcodeOutputs(outputDir)
+							}
+							// Skipping build and image creation process when if the Chipcode info is same as last build.
+							// The following process is calling after archiveChicodeOutputs() because, it use an outputed Chipcode info file.
+							if(params.JOB_TYPE == 'CI') {
+								LAST_BUILD_INFO_DIR = env.WORKSPACE + '/' + LAST_BUILD_INFO_DIR
+								if(!fileExists(LAST_BUILD_INFO_DIR)) {
+									sh("mkdir ${LAST_BUILD_INFO_DIR}")
+								}
+								// Checking the last build is completed.
+								if(libBuild.confirmCompleted(LAST_BUILD_INFO_DIR)) {
+									IS_SKIP_STAGE = true
+									libBuild.deleteCompletedRecord(LAST_BUILD_INFO_DIR)
+								}
+								if(libGetEnv.compareChipcodeInfo(LAST_BUILD_INFO_DIR, outputDir)) {
+									println 'ChipCode is same at last build.'
+								} else {
+									println 'ChipCode is mismatch to last one.'
+									libGetEnv.copyChipcodeInfo(outputDir, LAST_BUILD_INFO_DIR)
+									IS_SKIP_STAGE = false
+								}
+							}
+							println "Create ChipCode env Last Line"
+						}
+					}
+				}
+				stage('Construct Android env') {
+					options {
+						timeout(time: 6, unit: 'HOURS')
+					}
+					steps {
+						script {
+//							def androidPath = env.WORKSPACE + '/' + ymlData.DIR_CHIPCODE + '/' + ymlData.PATH_LD_ANDROID
+							def androidPath = env.WORKSPACE + '/' + ymlData.DIR_CHIPCODE
+							if (fileExists(androidPath)) {
+								dir(androidPath) {
+									def errMsg = libGetEnv.prepareBaseManifest(ymlData)
+									if(errMsg.length() != 0) {
+										error(errMsg)
+									}
+									// errMsg = libGetEnv.updateManifest(params.CHANGE_LIST)
+									// if(errMsg.length() != 0) {
+									// 	error(errMsg)
+									// }
+									errMsg = libGetEnv.getAndroidcode(ymlData)
+									if(errMsg.length() != 0) {
+										error(errMsg)
+									}
+									
+									errMsg = libGetEnv.updateChipcode(ymlData)
+									if(errMsg.length() != 0) {
+										error(errMsg)
+									}
+									if(params.JOB_TYPE == 'CI') {
+										if(libGetEnv.compareWithLastManifest(LAST_BUILD_INFO_DIR, outputDir)) {
+											println 'Manifest is same at last build.'
+										} else {
+											println 'Manifest is mismatch to last one.'
+											libGetEnv.copyToLastManifest(LAST_BUILD_INFO_DIR)
+											IS_SKIP_STAGE = false
+										}
+										println "Build skip is " + IS_SKIP_STAGE
+									}
+									libGetEnv.archiveManifestOutputs(env.WORKSPACE + '/' + ymlData.DIR_OUTPUT)
+								}
+							}
+							println "Create Android env Last Line" 
+						}
+					}
+				}
+				stage('QSSI Build Execute') {
+					when {
+						equals expected: false, actual: IS_SKIP_STAGE
+					}
+					steps {
+						script {
+							def chipcodePath = env.WORKSPACE + '/' + ymlData.DIR_CHIPCODE
+							def androidPath = chipcodePath + '/' + ymlData.PATH_LD_ANDROID_QSSI
+							def outputPath = env.WORKSPACE + '/' + ymlData.DIR_OUTPUT
+							dir(androidPath) {
+								def errMsg = libBuild.startAndroidQSSIBuild(ymlData)
+								if(errMsg.length() != 0) {
+									error(errMsg)
+								}
+							}
+							dir(chipcodePath) {
+								backupEnvVal = env.WORKSPACE
+								// sh("env")
+								// sh("unset WORKSPACE")
+								// sh("env")
+								// This because, 
+								//withEnv(["WORKSPACE="]){
+								//	def errMsg = libBuild.startBootTzBuild(ymlData)
+								//	if(errMsg.length() != 0) {
+								//		error(errMsg)
+								//	}
+							 	//}
+							 }
+							 dir(chipcodePath + '/common/build') {
+							 	//def errMsg = libBuild.startCreateAndroidImage(ymlData)
+								//if(errMsg.length() != 0) {
+								//	error(errMsg)
+								//}
+							 }
+							println "QSSI Build Execute Last Line"
+						}
+					}
+				}
+				stage('Vendor Build Execute') {
+					when {
+						equals expected: false, actual: IS_SKIP_STAGE
+					}
+					steps {
+						script {
+							def chipcodePath = env.WORKSPACE + '/' + ymlData.DIR_CHIPCODE
+							def androidPath = chipcodePath + '/' + ymlData.PATH_LD_ANDROID
+							def outputPath = env.WORKSPACE + '/' + ymlData.DIR_OUTPUT
+							dir(androidPath) {
+								def errMsg = libBuild.startAndroidBuild(ymlData)
+								if(errMsg.length() != 0) {
+									error(errMsg)
+								}
+							}
+							dir(androidPath) {
+								errMsg = libBuild.createSuperImage(ymlData)
+								if(errMsg.length() != 0) {
+									error(errMsg)
+								}
+							}
+							dir(chipcodePath) {
+								backupEnvVal = env.WORKSPACE
+								// sh("env")
+								// sh("unset WORKSPACE")
+								// sh("env")
+								// This because, 
+								//withEnv(["WORKSPACE="]){
+								//	def errMsg = libBuild.startBootTzBuild(ymlData)
+								//	if(errMsg.length() != 0) {
+								//		error(errMsg)
+								//	}
+								//}
+							}
+							dir(chipcodePath + '/snapdragon-auto-gen3-la/common/build') {
+								def errMsg = libBuild.startCreateAndroidImage(ymlData)
+								if(errMsg.length() != 0) {
+									error(errMsg)
+								}
+							}
+							println "Vendor Build Execute Last Line"
+						}
+					}
+				}
+				stage('Create FlatBuildImage') {
+					when {
+						allOf {
+						equals expected: "true", actual: CREATE_UFS_IMAGE
+							equals expected: false, actual: IS_SKIP_STAGE
+					}
+					}
+					environment {
+						FLATBUILD_JOBNAME = "JOB_ACiDS_1wk_image"
+            SAMBA_BASE_PATH = "//10.52.96.201/MNT-Path"
+					}
+					steps {
+						script {
+              
+              println "DEBUG: workspace = ${env.WORKSPACE}"
+              println "DEBUG: FLATBUILD_JOBNAME = ${env.FLATBUILD_JOBNAME}"
+              println "DEBUG: BUILD_NUMBER = ${env.BUILD_NUMBER}"
+              println "DEBUG: SAMBA BASE PATH = ${env.SAMBA_BASE_PATH}"
+                    
+							buildEnvPath = env.WORKSPACE.replace("/mnt",env.SAMBA_BASE_PATH) + '\\' + ymlData.DIR_CHIPCODE + '\\' + 'snapdragon-auto-gen3-la'
+              println "SAMBA1:${buildEnvPath}"                                                                          
+							buildEnvPath = buildEnvPath.replace("/","\\")
+							println "SAMBA2:${buildEnvPath}"
+              tmpdir = ymlData.PATH_LD_DP1188HM23_HN + "/" + MTITLE_DIR
+							NAME_DIRDP1188 = tmpdir.replace("/","\\")
+							def chipType = ""
+							if(params.SW_TYPE == "ISP") {
+								chipType = ymlData.TYPE_ISP.NAME_FLAVOR
+							} else if(params.SW_TYPE == "ICB") {
+								chipType = ymlData.TYPE_ICB.NAME_FLAVOR
+							} else {
+								err_msg = "Unknown SW type."
+								error(err_msg)
+							}
+							println "SAMBA:${buildEnvPath},CHP:${chipType},DP:${NAME_DIRDP1188}"
+							println "PN:${DATE_JOB},IM:${DATE_JOB}"
+							def build_info = build job: env.FLATBUILD_JOBNAME, parameters: [
+								[$class: 'StringParameterValue', name: 'DIR_SAMBASTL', value: "${buildEnvPath}"]
+								,[$class: 'StringParameterValue', name: 'TYPE_CHIP', value: "${chipType}"]
+								,[$class: 'StringParameterValue', name: 'DIR_DP1188', value: "${NAME_DIRDP1188}"]
+								,[$class: 'StringParameterValue', name: 'PARENTD_NAME', value: "${DATE_JOB}"]
+								,[$class: 'StringParameterValue', name: 'IMAGE_NAME', value: "${DATE_JOB}"]
+								,[$class: 'StringParameterValue', name: 'DIR_CDT', value: '']
+							], propagate: false
+							currentBuild.result = build_info.getResult()
+							println "Build FlatBuildImage job #${build_info.getNumber()} / ${currentBuild.result}"
+							if (currentBuild.result == "FAILURE") {
+								err_msg = "error FlatBuildImage."
+								error(err_msg)
+								//Stop removing JOB
+								ENABLE_ERASE = false
+							}
+						}
+					}
+				}
+			}	//stages
+			post {
+				failure {
+					script {
+						if (err_msg == env.NONE_MSG) {
+							err_msg = "failure post."
+						}
+						//OUTPUT
+						def tmpdest = WORK_OUTPUT + '/error_' + env.DATETIME + '.log'
+						if (!fileExists(tmpdest)) {
+							def tmpsrc = env.WORKSPACE + '/' + ymlData.DIR_CHIPCODE + '/' + ymlData.PATH_LD_ANDROID + '/out/dist/logs/' + ymlData.FILE_ERRLOG
+							if (fileExists(tmpsrc)) {
+								sh "mv -f ${tmpsrc} ${tmpdest}"
+							}
+						}
+					}
+				}
+				aborted {
+					script {
+						err_msg = "aborted post."
+						//OUTPUT
+						def tmpdest = WORK_OUTPUT + '/error_' + env.DATETIME + '.log'
+						if (!fileExists(tmpdest)) {
+							def tmpsrc = env.WORKSPACE + '/' + ymlData.DIR_CHIPCODE + '/' + ymlData.PATH_LD_ANDROID + '/out/dist/logs/' + ymlData.FILE_ERRLOG
+							if (fileExists(tmpsrc)) {
+								sh "mv -f ${tmpsrc} ${tmpdest}"
+							}
+						}
+					}
+				}
+				cleanup {
+					script {
+						//.git-credentials
+						def retScript = sh(script: "[ -s ~/${ymlData.FILE_CREDENTIALS_BKUP} ]", returnStatus: true) == 0
+						if (retScript) {
+							sh "mv -f ~/${ymlData.FILE_CREDENTIALS_BKUP} ~/.git-credentials"
+						}
+						//.gitconfig
+						retScript = sh(script: "[ -s ~/${ymlData.FILE_CONFIG_BKUP} ]", returnStatus: true) == 0
+						if (retScript) {
+							sh "mv -f ~/${ymlData.FILE_CONFIG_BKUP} ~/.gitconfig"
+						}
+						println "msg: ${err_msg}"
+						if (fileExists(WORK_OUTPUT)) {
+							if ((err_msg != env.NONE_MSG)&&(err_msg != ymlData.MSG_ERRSPACE)) {
+								getJenkinslog()
+							}
+							if (err_msg != ymlData.MSG_ERRSPACE) {
+								def tmplcnt = sh(script: "ls ${WORK_OUTPUT}", returnStdout: true)
+								if (tmplcnt.size() > 0) {
+									deployDp1188(DATE_DIR)
+									def tmpdir = ymlData.PATH_LD_DP1188HM23_HN + '/' + MTITLE_DIR
+									def tmp_DIRDP1188 = tmpdir.replace("/","\\\\")
+									retScript = sh(script: "[ \"${currentBuild.result}\" != \"${env.SUCCESS_MSG}\" ]", returnStatus: true) == 0
+									if (retScript) {
+										redmine_api("'{\"issue\":{\"notes\":\"Build: Failure. \\n Server: ${tmp_DIRDP1188}\\\\${DATE_JOB}\", \"custom_fields\":[{\"value\":\"Integration failed\", \"id\":297}]}}'")
+									} else {
+										redmine_api("'{\"issue\":{\"notes\":\"Build: Success. \\n Server: ${tmp_DIRDP1188}\\\\${DATE_JOB}\", \"custom_fields\":[{\"value\":\"${tmp_DIRDP1188}\\\\${DATE_JOB}\", \"id\":299},{\"value\":\"Build Finish\", \"id\":297}]}}'")
+										libBuild.recordCompleted(LAST_BUILD_INFO_DIR)
+									}
+								} else {
+									redmine_api("'{\"issue\":{\"notes\":\"Build: Failure. \\n Error: ${err_msg}\", \"custom_fields\":[{\"value\":\"Integration failed\", \"id\":297}]}}'")
+									//SFTP
+									CHK_SERVER = false
+								}
+							} else {
+								redmine_api("'{\"issue\":{\"notes\":\"Error: ${err_msg}\", \"custom_fields\":[{\"value\":\"Integration failed\", \"id\":297}]}}'")
+								//SFTP
+								CHK_SERVER = false
+							}
+						} else {
+							redmine_api("'{\"issue\":{\"notes\":\"Error: ${err_msg}\", \"custom_fields\":[{\"value\":\"Integration failed\", \"id\":297}]}}'")
+							//SFTP
+							CHK_SERVER = false
+						}
+						if (params.MAILADDR_LIST.size() > 0) {
+							sendMail(err_msg)
+						}
+						//Remove JOB directory
+						if(ENABLE_ERASE == true) {
+							dir(env.WORKSPACE) {
+								sh "rm -rf ./*"
+								sh "echo 'Remove done.'"
+							}
+						}
+					}
+				}
+			}	//post
+		}	//Agent HM_build_servers
+		stage('Agent HM_SFTP_server') {
+			when {
+				expression {
+					return CHK_SERVER == true
+				}
+			}
+			agent {
+				node {
+					label params.SFTP_NODE
+				}
+			}
+			//stages {
+				//stage('Access Server') {
+					//steps {
+						//script {
+							//if (fileExists(ymlData.PATH_LD_MNTPOINT)) {
+							//	println 'FOUND directory: ' + ymlData.PATH_LD_MNTPOINT
+							//} else {
+							//	sh "mkdir -p ${ymlData.PATH_LD_MNTPOINT}"
+							//}
+							//def tmpdir = ymlData.PATH_LD_MNTPOINT + '/' + ymlData.PATH_LD_DELIVER
+							//if (fileExists(tmpdir)) {
+								//println "Skip mount: " + tmpdir
+							//} else {
+								//withCredentials([usernamePassword(credentialsId: "${CRED_DP1188_ACCT}", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+									//sh "mount -r -t cifs -o username=${USERNAME},password=${PASSWORD} ${ymlData.PATH_LD_DP1188HM23_IP} ${ymlData.PATH_LD_MNTPOINT}"
+								//}
+								//if (fileExists(tmpdir)) {
+								//	println 'FOUND deliver: ' + tmpdir
+								//} else {
+								//	err_msg = 'error mount'
+								//	error(err_msg)
+								//}
+							//}
+                                                       
+							//if (SET_SERVER.name == "Feature") {
+								//withCredentials([sshUserPrivateKey(credentialsId: "${SET_SERVER.accname}", keyFileVariable: 'keyfile')]) {
+									//sh("""\
+										//echo "cd ${SET_SERVER.pathname}" > sftp.bat
+										//echo "lcd ${ymlData.PATH_LD_MNTPOINT}/${MTITLE_DIR}" >> sftp.bat
+										//echo "put -r ${DATE_JOB}" >> sftp.bat
+										//echo "quit" >> sftp.bat
+										//sftp -b sftp.bat -o ProxyCommand='nc -X 5 -x squid.alpine.co.jp:8022 %h %p' builder@${SET_SERVER.serverpath}
+										//rm sftp.bat
+									//""")
+								//}
+								//redmine_api("'{\"issue\":{\"notes\":\"SFTP: ${SET_SERVER.pathname}/${DATE_JOB}\"}}'")
+							//} else {
+								//withCredentials([usernamePassword(credentialsId: "${SET_SERVER.accname}", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+									//sh "smbclient ${SET_SERVER.serverpath} -U jp/${USERNAME}%\"${PASSWORD}\" -D ${SET_SERVER.pathname} -c \"lcd ${ymlData.PATH_LD_MNTPOINT}/${MTITLE_DIR};prompt;recurse;mput ${DATE_JOB}\""
+								}
+								//Redmine
+								//tmpdir = '//apnftp01/SFTP/' + SET_SERVER.pathname + '/' + DATE_JOB
+								//def tmp_DIRAPNFTP = tmpdir.replace("/","\\\\")
+								//redmine_api("'{\"issue\":{\"notes\":\"SFTP: ${tmp_DIRAPNFTP}\"}}'")
+							//}
+                                                       
+							//println "Access Server Last Line"
+						//}
+					//}
+				//}
+			//}	//stages
+                        //}
+			post {
+				cleanup {
+					script {
+						def tmpdir = ymlData.PATH_LD_MNTPOINT + '/' + ymlData.PATH_LD_DELIVER
+						if (fileExists(tmpdir)) {
+							println 'umount FOUND deliver: ' + tmpdir
+							sh "umount -l ${ymlData.PATH_LD_MNTPOINT}"
+						}
+					}
+				}
+			}	//post
+		}	//Agent HM_SFTP_server
+	}
+//}	//pipeline
+//}	//call
+def sendMail(msg) {
+	def SENDADDR
+	def tmpfile = ymlData.DIR_OUTPUT + '/Manifest_' + DATE_DELIVER + '.xml'
+	if (fileExists(tmpfile)) {
+		SENDADDR = tmpfile
+	}
+	tmpfile = ymlData.DIR_OUTPUT + '/error_' + DATE_DELIVER + '.log'
+	if (fileExists(tmpfile)) {
+		if (SENDADDR != null) {
+			SENDADDR += ',' + tmpfile
+		} else {
+			SENDADDR = tmpfile
+		}
+	}
+	tmpfile = ymlData.DIR_OUTPUT + '/Jenkins_Log.zip'
+	if (fileExists(tmpfile)) {
+		if (SENDADDR != null) {
+			SENDADDR += ',' + tmpfile
+		} else {
+			SENDADDR = tmpfile
+		}
+	}
+	emailext(attachmentsPattern: SENDADDR, 
+			body: """
+Result: [${currentBuild.result}]
+Build Node: ${env.NODE_NAME}
+JOB: ${env.JOB_NAME} #${env.BUILD_NUMBER}
+JOB URL: ${BUILD_URL}
+LOG URL: ${BUILD_URL}consoleText
+DP1188: ${NAME_DIRDP1188}\\${DATE_JOB}
+Manifest URL: ${params.MANIFEST_URL}
+Manifest Branch: ${params.MANIFEST_BRANCH}
+note: ${msg}
+""", 
+			subject: "${DATE_JOB} #${env.BUILD_NUMBER} [${currentBuild.result}]", 
+			to: "${params.MAILADDR_LIST}", 
+			from: "h23m_integ@alpsalpine.com"
+	)
+}
+//def makedirDp1188(mk_dir) 
+//	withCredentials([uisernamePassword(credentialsId: "${CRED_DP1188_ACCT}", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+		//sh "smbclient ${ymlData.PATH_LD_DP1188HM23_IP} -U ${USERNAME}%${PASSWORD} -c \"mkdir ${mk_dir}\""
+//	}
+//}
+//def deployDp1188(mk_dir) {
+//	withCredentials([usernamePassword(credentialsId: "${CRED_DP1188_ACCT}", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+		//sh "smbclient ${ymlData.PATH_LD_DP1188HM23_IP} -U ${USERNAME}%${PASSWORD} -c \"lcd ${env.WORKSPACE}/${ymlData.DIR_OUTPUT};cd ${mk_dir};prompt;recurse;mput *\""
+//	}
+//}
+//def redmine_api(note_data) {
+//	if (ticket_id.size() > 0) {
+//		withCredentials([usernamePassword(credentialsId: "${CRED_REDMINE_ACCT}", usernameVariable: 'REDMINE_URL_HM', passwordVariable: 'REDMINE_API_KEY_HM')]) {
+//			sh "curl -X PUT -v -H \"Content-Type: application/json\" ${REDMINE_URL_HM}/issues/${ticket_id}.json -H \"X-Redmine-API-Key:${REDMINE_API_KEY_HM}\" -d ${note_data}"
+//		}
+//	}
+//}
+def getJenkinslog() {
+	withCredentials([usernamePassword(credentialsId: "${CRED_JENKINS_TOKEN}", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+		sh("""\
+			cd ${env.WORKSPACE}
+			wget -q --auth-no-challenge --http-user=${USERNAME} --http-password=${PASSWORD} ${env.BUILD_URL}consoleText -O consoleText.txt
+			tail -n 524 consoleText.txt > consoleTail.txt
+			head -n 500 consoleTail.txt > Jenkins_Log.log
+			zip ${WORK_OUTPUT}/Jenkins_Log.zip Jenkins_Log.log
+		""")
+	}
+}
+def make_credurl(accusr, accpsw, accst) {
+	accusr = sh(script: "urlencode ${accusr}", returnStdout: true)
+	accpsw = sh(script: "urlencode ${accpsw}", returnStdout: true)
+	tmpurl = 'https://' + accusr.trim() + ':' + accpsw.trim() + accst
+	return tmpurl
+}
+}
