@@ -1,0 +1,63 @@
+set IN_BUILDENV=%DIR_SAMBASTL%
+set WORK_NUM=%TYPE_CHIP%
+set IN_OUTDIR=%WORKSPACE%
+set IN_CDT=%DIR_CDT%
+set QFIL=C:\Program Files (x86)\Qualcomm\QPST\bin\QFIL.exe
+set COMM7Z=C:\Program Files\7-Zip\7z.exe
+set time2=%time: =0%
+REM Get the current time
+for /f "tokens=1-3 delims=:.," %%A in ("%TIME%") do (
+    REM Extract hour, minute, and second components
+    set "HOUR=%%A"
+    set "MINUTE=%%B"
+    set "SECOND=%%C"
+)
+
+REM Get the current date in the format DDMMYY
+set "DATE=%DATE:~-7,2%%DATE:~-10,2%%DATE:~-2%"
+
+REM Create the filename
+set "BUILD_TIME=%DATE%_%HOUR%_%MINUTE%_%SECOND%"
+
+REM Echo the build time
+echo %BUILD_TIME%
+
+
+REM cmdkey /add:172.31.126.54 /user:%ACCESS_USER% /pass:%ACCESS_PASS%
+
+IF not defined IN_BUILDENV (
+  exit /b 1
+)
+IF not defined WORK_NUM (
+  exit /b 1
+)
+
+echo "Started."
+REM "%QFIL%" -Mode=3 -flatmeta -METABUILD="\\%IN_BUILDENV%\contents.xml;%WORK_NUM%;ufs" -FLATBUILDPATH="%IN_OUTDIR%" -FLATBUILDFORCEOVERRIDE=true -logfilepath="%IN_OUTDIR%\log_ufs.txt"
+IF defined IN_CDT (
+  copy /Y %IN_CDT%\* %IN_OUTDIR%\ufs
+)
+
+IF not defined PARENTD_NAME (
+  set IN_DIR=%JOB_NAME%
+) else (
+  set IN_DIR=%PARENTD_NAME%
+)
+IF not defined IMAGE_NAME (
+  set IMAGE_DIR=ufs_%date:~0,4%%date:~5,2%%date:~8,2%%time2:~0,2%%time2:~3,2%
+) else (
+  set IMAGE_DIR=%IMAGE_NAME%_ufs
+)
+IF not defined DIR_DP1188 (
+  set DIR_DP1188TMP=\\10.52.96.201\MNT-Path\scm_team\workspace\SCM_TEAM\Member\Ayesha\Kpit_A13_Build\A13_ISP_ALAP_Ayesha\env
+) else (
+  set DIR_DP1188TMP=%DIR_DP1188%
+)
+IF not exist %DIR_DP1188TMP%\%IN_DIR% (
+  mkdir %DIR_DP1188TMP%\%IN_DIR%
+)
+
+
+copy /Y %IN_OUTDIR%\log_ufs.txt %DIR_DP1188TMP%\%IN_DIR%
+echo %BUILD_TIME%
+"%COMM7Z%" a -tzip "%DIR_DP1188TMP%\%IN_DIR%\%IMAGE_DIR%_%BUILD_TIME%.zip" %IN_OUTDIR%\ufs
