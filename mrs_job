@@ -1,0 +1,103 @@
+pipeline {
+    agent {
+        label 'cicd_server'
+    }
+    
+    environment {
+        MR_NUMBER = '722' // Default MR number
+        REPO_PATH = '/mnt/mirror/a14_dev_build_test/snapdragon-auto-gen3-la/apps_vendor/LINUX/android/vendor/alpine/hardware/implements/vehicle'
+        SSH_HOST = 'ayeshas1@10.52.96.11'
+        SSH_PORT = '29418'
+        GIT_REMOTE_URL = 'ssh://ayeshas1@10.52.96.11:29418/platform/vendor/alpine/hardware/implements/vehicle'
+        BRANCH_NAME = '14-8155-happi-es41-bringup-dev'
+    }
+    
+    stages {
+        stage('SSH Queries') {
+            steps {
+                script {
+                    // Fetch the specific change from Gerrit
+                    def sshOutput = sh(script: "ssh -p ${env.SSH_PORT} ${env.SSH_HOST} gerrit query --format=JSON --current-patch-set change:${env.MR_NUMBER}",
+                                       returnStdout: true).trim()
+
+                    // Print the SSH query output
+                    echo "SSH Query Output:"
+                    echo sshOutput
+
+                    // Parse the JSON output
+                    def jsonOutput = readJSON text: sshOutput
+
+                    // Extract ref, project details, and URL
+                    def currentPatchSet = jsonOutput.currentPatchSet
+                    if (currentPatchSet) {
+                        def ref = currentPatchSet.ref
+                        def project = jsonOutput.project
+                        def url = jsonOutput.url
+
+                        // Set environment variables for use in the next stage
+                        env.REF = ref
+                        env.PROJECT = project
+                        env.URL = url
+
+                        // Print the extracted information
+                        echo "REF: ${env.REF}"
+                        echo "Project: ${env.PROJECT}"
+                        echo "URL: ${env.URL}"
+                    } else {
+                        echo "Failed to retrieve the patchset and change number from Gerrit. Please check if the change exists."
+                        currentBuild.result = 'FAILURE'
+                        error "Failed to retrieve the patchset and change number from Gerrit."
+                    }
+                }
+            }
+        }
+        
+        stage('Cherry-pick') {
+            steps {
+                script {
+                    // Change directory to the repository
+                    dir(env.REPO_PATH) {
+                        // Check if there's an ongoing cherry-pick operation
+                        def cherryPickInProgress = sh(script: "git status --short | grep -q '^U'",
+                                                       returnStatus: true)
+                        
+                        if (cherryPickInProgress == 0) {
+                            // Abort the ongoing cherry-pick
+                            sh "git cherry-pick --abort"
+                            echo "Aborted the ongoing cherry-pick."
+                        }
+                        
+                        // Fetch latest changes from the remote repository
+                        sh "git fetch --all"
+                        
+                        // Checkout the target branch
+                        sh "git checkout -f ${env.BRANCH_NAME}"
+                        
+                        // Display the latest commit on the target branch
+                        sh "git log -1"
+                        
+                        // Proceed with the cherry-pick process without committing
+                        def cherryPickResult = sh(script: "git fetch ${env.GIT_REMOTE_URL} refs/changes/${env.REF.split('/')[2]}/${env.MR_NUMBER}/${env.REF.split('/')[4]} && git cherry-pick --no-commit FETCH_HEAD",
+                                                   returnStatus: true)
+                        
+                        // Check if the cherry-pick was successful
+                        if (cherryPickResult == 0) {
+                            // Check if there are any unmerged files
+                            def unmergedFiles = sh(script: "git status --short | grep -q '^UU'",
+                                                   returnStatus: true)
+                            
+                            if (unmergedFiles == 0) {
+                                echo "Cherry-pick successful."
+                            } else {
+                                echo "Conflict occurred during cherry-pick. Please resolve conflicts manually."
+                                return
+                            }
+                        } else {
+                            echo "Cherry-pick failed. Please check the logs for details."
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
