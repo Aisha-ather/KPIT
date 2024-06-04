@@ -1,0 +1,181 @@
+pipeline {
+	agent {
+		node {
+			label "cicd_server"
+		}
+	}
+	options {
+		timestamps()
+	}
+	environment {
+		NONE_MSG = "none"
+		err_msg = ""
+		ISP_JOB_NAME = "A14_ISP_OfficialBuild"
+		//ICB_JOB_NAME = "32_ICB_OfficialBuild_A14"
+		VERSION_6155 = ""
+		VERSION_8155 = ""
+		ISP_NODE_NAME = "HM_Official_ISP_servers"
+		//ICB_NODE_NAME = "HM_Official_ICB_servers"
+        OMEGA_YML_NAME = "BuildInfo_8155_LA351.yml"
+        NONOMEGA_YML_NAME = "BuildInfo_8155_LA351_NonOmega.yml"
+	}
+
+	stages {
+		stage('Check parameters') {
+			steps {
+			    script {
+					if (INPUT_ISP_VERSION.length() <= 2) {
+						err_msg = "parameter error ISP_VERSION."
+						error(err_msg)
+					}
+					VERSION_6155 = INPUT_ISP_VERSION.substring(0,INPUT_ISP_VERSION.length()-2) + "Cx"
+					VERSION_8155 = INPUT_ISP_VERSION.substring(0,INPUT_ISP_VERSION.length()-2) + "Dx"
+					println VERSION_6155
+					println VERSION_8155
+			    }
+			}
+		}
+        stage('Execute Build') {
+            parallel {
+				    /*stage('ICB 8155 nonOmega user') {
+                    when {
+						equals expected: "true", actual: ENABLE_ICB_8155_nonOmega_USER
+					}
+                    steps {
+                        script {
+                            if (BUILD_RULE == "Regular") {
+                                build(job: "${ICB_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "user"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}_nonOmega"),
+                                                                            string(name: "MAIN_NODE", value: "${ICB_8155_nonOmega_USER_NODE}"),
+                                                                            string(name: "YAML_NAME", value: "${NONOMEGA_YML_NAME}")
+                                                                        ])
+                            } else if (BUILD_RULE == "Freedom") {
+                                build(job: "${ICB_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "user"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}_nonOmega"),
+                                                                            string(name: "YAML_NAME", value: "${NONOMEGA_YML_NAME}")
+                                                                        ])
+                            }
+                        }
+                    }
+                }
+                stage('ICB 8155 nonOmega userdebug') {
+                    when {
+						equals expected: "true", actual: ENABLE_ICB_8155_nonOmega_USERDEBUG
+					}
+                    steps {
+                        script {
+                            if (BUILD_RULE == "Regular") {
+                                build(job: "${ICB_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "userdebug"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}_nonOmega"),
+                                                                            string(name: "MAIN_NODE", value: "${ICB_8155_nonOmega_USERDEBUG_NODE}"),
+                                                                            string(name: "YAML_NAME", value: "${NONOMEGA_YML_NAME}"),
+                                                                            string(name: "ENABLE_AUTO_TEST", value: "${ENABLE_TEST_nonOmega_userdebug}")
+                                                                        ])
+                            } else if (BUILD_RULE == "Freedom") {
+                                build(job: "${ICB_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "userdebug"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}_nonOmega"),
+                                                                            string(name: "YAML_NAME", value: "${NONOMEGA_YML_NAME}"),
+                                                                            string(name: "ENABLE_AUTO_TEST", value: "${ENABLE_TEST_nonOmega_userdebug}")
+                                                                        ])
+                            }
+                        }
+                    }
+                }
+                stage('ICB 8155 user') {
+                	when {
+						equals expected: "true", actual: ENABLE_ICB_8155_USER
+					}
+                    steps {
+                        script {
+                            if (BUILD_RULE == "Regular") {
+                                build(job: "${ICB_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "user"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}_Omega"),
+                                                                            string(name: "MAIN_NODE", value: "${ICB_8155_USER_NODE}"),
+                                                                            string(name: "YAML_NAME", value: "${OMEGA_YML_NAME}")
+                                                                        ])
+                            } else if (BUILD_RULE == "Freedom") {
+                                build(job: "${ICB_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "user"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}_Omega"),
+                                                                            string(name: "YAML_NAME", value: "${OMEGA_YML_NAME}")
+                                                                        ])
+                            }
+                        }
+                    }
+                }
+                stage('ICB 8155 userdebug') {
+                    when {
+						equals expected: "true", actual: ENABLE_ICB_8155_USERDEBUG
+					}
+                    steps {
+                        script {
+                            if (BUILD_RULE == "Regular") {
+                                build(job: "${ICB_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "userdebug"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}_Omega"),
+                                                                            string(name: "MAIN_NODE", value: "${ICB_8155_USERDEBUG_NODE}"),
+                                                                            string(name: "YAML_NAME", value: "${OMEGA_YML_NAME}"),
+                                                                            string(name: "ENABLE_AUTO_TEST", value: "${ENABLE_TEST_Omega_userdebug}")
+                                                                        ])
+                            } else if (BUILD_RULE == "Freedom") {
+                                build(job: "${ICB_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "userdebug"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}_Omega"),
+                                                                            string(name: "YAML_NAME", value: "${OMEGA_YML_NAME}"),
+                                                                            string(name: "ENABLE_AUTO_TEST", value: "${ENABLE_TEST_Omega_userdebug}")
+                                                                        ])
+                            }
+                        }
+                    }
+                }*/
+                stage('ISP 8155 userdebug') {
+                    when {
+						equals expected: "true", actual: ENABLE_ISP_8155_USERDEBUG
+					}
+                    steps {
+                        script {
+                            if (BUILD_RULE == "Regular") {
+                                build(job: "${ISP_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "userdebug"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}"),
+                                                                            string(name: "MAIN_NODE", value: "${ISP_8155_USERDEBUG_NODE}")
+                                                                        ])
+                            } else if (BUILD_RULE == "Freedom") {
+                                build(job: "${ISP_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "userdebug"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}")
+                                                                        ])
+                            }
+                        }
+                    }
+                }
+                stage('ISP 8155 user') {
+                    when {
+						equals expected: "true", actual: ENABLE_ISP_8155_USER
+					}
+                    steps {
+                        script {
+                            if (BUILD_RULE == "Regular") {
+                                build(job: "${ISP_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "user"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}"),
+                                                                            string(name: "MAIN_NODE", value: "${ISP_8155_USER_NODE}")
+                                                                        ])
+                            } else if (BUILD_RULE == "Freedom") {
+                                build(job: "${ISP_JOB_NAME}", parameters: [string(name: "BUILD_BOARD", value: "8155"),
+                                                                            string(name: "BUILD_TYPE", value: "user"),
+                                                                            string(name: "BUILD_VERSION", value: "${VERSION_8155}")
+                                                                        ])
+                            }
+                        }
+                    }
+                }
+            }
+		}
+	}
+}
