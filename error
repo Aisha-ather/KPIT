@@ -1,35 +1,60 @@
-pipeline {
-    agent any
-    environment {
-        // Define any global environment variables here
-    }
-    stages {
-        stage('Initialization') {
-            steps {
-                script {
-                    // Attempt to load libUtils.groovy
-                    def libUtils
-                    try {
-                        libUtils = load '/home/alpinecicd/Ayesha/shared-library-jenkins/vars/libUtils.groovy'
-                    } catch (Exception e) {
-                        echo "Failed to load libUtils: ${e.message}"
-                        // Handle the error appropriately
-                    }
-                    
-                    // Assuming libUtils is loaded, attempt to use it
-                    if (libUtils) {
-                        def ymlData = libUtils.getYmlDataFromResource()
-                        // Use ymlData as needed...
-                    } else {
-                        echo "libUtils is null, cannot proceed."
-                        // Take appropriate action, such as failing the build
-                    }
-                }
-            }
-        }
-        // Additional stages...
-    }
-    post {
-        // Post-build actions...
-    }
-}
+Started by user Ayesha Shaik
+Running as SYSTEM
+[EnvInject] - Loading node environment variables.
+Building remotely on pune_desktop_machine in workspace C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage
+[test_OfficialImage] $ cmd /c call C:\Users\JANARD~1\AppData\Local\Temp\jenkins1179936744840814868.bat
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>set IN_BUILDENV= 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>set WORK_NUM=8155 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>set IN_OUTDIR=C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>set IN_CDT= 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>set QFIL=C:\Program Files (x86)\Qualcomm\QPST\bin\QFIL.exe 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>set COMM7Z=C:\Program Files\7-Zip\7z.exe 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>set time2=21:43:51.01 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>REM Get the current time 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>for /F "tokens=1-3 delims=:.," %A in ("21:43:51.01") do (
+REM Extract hour, minute, and second components  
+ set "HOUR=%A"  
+ set "MINUTE=%B"  
+ set "SECOND=%C" 
+) 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>(
+REM Extract hour, minute, and second components  
+ set "HOUR=21"  
+ set "MINUTE=43"  
+ set "SECOND=51" 
+) 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>REM Get the current date in the format DDMMYY 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>set "DATE=120624" 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>REM Create the filename 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>set "BUILD_TIME=120624_21_43_51" 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>REM Echo the build time 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>echo 120624_21_43_51 
+120624_21_43_51
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>REM set time2=21:43:51.02 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>REM set VOLUME_NAME= 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>REM cmdkey /add:172.31.126.54 /user: /pass: 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>REM cmdkey /add:172.29.245.30 /user: /pass: 
+
+C:\Users\janardans\workspace\SCM_TEAM\Member\Ayesha\MasterPipeline\test_OfficialImage>IF not defined IN_BUILDENV (exit /b 1 ) 
+Build step 'Execute Windows batch command' marked build as failure
+Finished: FAILURE
